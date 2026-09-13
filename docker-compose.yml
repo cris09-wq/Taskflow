@@ -1,0 +1,122 @@
+# TASKFLOW - Orquestación de los 5 servicios principales (sección 6 y 9
+# del enunciado): frontend, backend, worker, mongoserver y redisserver.
+# Todos los servicios se comunican entre sí utilizando sus nombres de
+# servicio (nunca "localhost") dentro de la red "taskflow-network".
+
+services:
+
+  # ------------------------------------------------------------------
+  # MongoDB - Persistencia principal (HU-10)
+  # ------------------------------------------------------------------
+  mongoserver:
+    image: mongo:7
+    container_name: taskflow-mongoserver
+    restart: unless-stopped
+    ports:
+      - "27017:27017"   # Puerto publicado al host (opcional, útil para depurar con Compass/mongosh)
+    volumes:
+      - mongo-data:/data/db   # Volumen Docker: conserva los datos aunque el contenedor se recree
+    networks:
+      - taskflow-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # Redis - Caché y cola de procesamiento (HU-04, HU-08)
+  # ------------------------------------------------------------------
+  redisserver:
+    image: redis:7-alpine
+    container_name: taskflow-redisserver
+    restart: unless-stopped
+    ports:
+      - "6379:6379"   # Puerto publicado al host (opcional, útil para depurar con redis-cli)
+    networks:
+      - taskflow-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # Backend - Node.js + Express + Socket.IO (API REST)
+  # ------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: taskflow-backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"   # Puerto publicado al host, consumido por el navegador (Vue)
+    environment:
+      PORT: 4000
+      MONGO_URI: mongodb://mongoserver:27017/taskflow
+      REDIS_HOST: redisserver
+      REDIS_PORT: 6379
+      CACHE_TTL: 60
+      CORS_ORIGIN: http://localhost:8080
+    depends_on:
+      mongoserver:
+        condition: service_healthy
+      redisserver:
+        condition: service_healthy
+    networks:
+      - taskflow-network
+
+  # ------------------------------------------------------------------
+  # Worker - Proceso independiente de procesamiento asíncrono (HU-05)
+  # ------------------------------------------------------------------
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: taskflow-worker
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://mongoserver:27017/taskflow
+      REDIS_HOST: redisserver
+      REDIS_PORT: 6379
+      WORKER_CONCURRENCY: 2
+      HEARTBEAT_INTERVAL_MS: 5000
+      PROCESSING_DELAY_MS: 2000
+    depends_on:
+      mongoserver:
+        condition: service_healthy
+      redisserver:
+        condition: service_healthy
+    networks:
+      - taskflow-network
+    # El Worker no expone puertos: no atiende peticiones del usuario (sección 8).
+
+  # ------------------------------------------------------------------
+  # Frontend - Vue 3 (servido como build estático mediante Nginx)
+  # ------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # URLs consumidas por el NAVEGADOR: usan localhost + puerto publicado,
+        # nunca el nombre del servicio Docker (esa regla aplica solo entre contenedores).
+        VITE_API_URL: http://localhost:4000/api
+        VITE_SOCKET_URL: http://localhost:4000
+    container_name: taskflow-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"   # Puerto publicado al host: http://localhost:8080
+    depends_on:
+      - backend
+    networks:
+      - taskflow-network
+
+networks:
+  taskflow-network:
+    driver: bridge
+
+volumes:
+  mongo-data:
+    driver: local
