@@ -1,10 +1,12 @@
-# TASKFLOW - Orquestación de los servicios (sección 6 y 9 del enunciado):
-# frontend, backend, worker y redisserver.
+# TASKFLOW (rama backend) - Orquestación de los servicios del backend:
+# redisserver, backend y worker.
 # Todos los servicios se comunican entre sí utilizando sus nombres de
 # servicio (nunca "localhost") dentro de la red "taskflow-network".
 #
 # Nota: MongoDB no se orquesta con Docker Compose; el proyecto se conecta a
 # MongoDB Atlas (nube) mediante la variable MONGO_URI (ver README).
+# El frontend (Vue) vive en la rama "frontend" del repositorio y se ejecuta
+# por separado contra esta API.
 
 services:
 
@@ -35,7 +37,7 @@ services:
     container_name: taskflow-backend
     restart: unless-stopped
     ports:
-      - "4000:4000"   # Puerto publicado al host, consumido por el navegador (Vue)
+      - "4000:4000"   # Puerto publicado al host, consumido por el navegador (frontend) o el cliente API
     environment:
       PORT: 4000
       MONGO_URI: "${MONGO_URI:-mongodb://mongoserver:27017/taskflow}"
@@ -71,27 +73,6 @@ services:
     networks:
       - taskflow-network
     # El Worker no expone puertos: no atiende peticiones del usuario (sección 8).
-
-  # ------------------------------------------------------------------
-  # Frontend - Vue 3 (servido como build estático mediante Nginx)
-  # ------------------------------------------------------------------
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        # URLs consumidas por el NAVEGADOR: usan localhost + puerto publicado,
-        # nunca el nombre del servicio Docker (esa regla aplica solo entre contenedores).
-        VITE_API_URL: http://localhost:4000/api
-        VITE_SOCKET_URL: http://localhost:4000
-    container_name: taskflow-frontend
-    restart: unless-stopped
-    ports:
-      - "8080:80"   # Puerto publicado al host: http://localhost:8080
-    depends_on:
-      - backend
-    networks:
-      - taskflow-network
 
 networks:
   taskflow-network:
