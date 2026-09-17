@@ -1,18 +1,22 @@
-# TASKFLOW
+# TASKFLOW · Backend
 
-Sistema Full Stack para la gestión y procesamiento asíncrono de solicitudes.
+API REST + Socket.IO para el sistema TaskFlow de gestión y procesamiento
+asíncrono de solicitudes.
 
-**Stack:** Vue 3 · Node.js/Express · Socket.IO · MongoDB · Redis (caché + cola con BullMQ) · Worker Node.js · Docker Compose.
+**Stack:** Node.js/Express · Socket.IO · MongoDB Atlas · Redis (caché + cola con BullMQ) · Worker Node.js · Docker Compose.
+
+> Esta rama corresponde **solo al backend**. El frontend (Vue 3) vive en la
+> rama `frontend` del mismo repositorio y se ejecuta por separado contra esta API.
 
 ---
 
 ## 1. Arquitectura
 
 ```text
-Usuario → Vue 3 → Express (REST + Socket.IO) → MongoDB / Redis
-                                                     │
-                                                     ▼
-                                              Redis Queue → Worker → MongoDB
+Cliente (frontend / API) → Express (REST + Socket.IO) → MongoDB / Redis
+                                                                │
+                                                                ▼
+                                                         Redis Queue → Worker → MongoDB
 ```
 
 - El **frontend nunca se conecta directamente** a MongoDB ni a Redis; toda la comunicación pasa por Express.
@@ -23,36 +27,16 @@ Usuario → Vue 3 → Express (REST + Socket.IO) → MongoDB / Redis
 ## 2. Estructura del repositorio
 
 ```text
-taskflow/
+taskflow/ (rama backend)
 ├── docker-compose.yml
 ├── README.md
 ├── backend/     → API REST (Express) + Socket.IO
-├── worker/      → Procesamiento asíncrono independiente
-└── frontend/    → Aplicación Vue 3
+└── worker/      → Procesamiento asíncrono independiente
 ```
 
-Cada carpeta (`backend/`, `worker/`, `frontend/`) tiene su propio `package.json`, `Dockerfile` y `.env.example`.
+Cada carpeta (`backend/`, `worker/`) tiene su propio `package.json`, `Dockerfile` y `.env.example`.
 
-### 2.1 Estructura del frontend
-
-```text
-frontend/src
-├── assets/        # Recursos estáticos
-├── components/    # Buttons, Tables, Headers, Status, StatCard, Requests
-├── views/         # DashboardView, NewRequestView, RequestsView, RequestDetailView, MonitorView
-├── composables/   # useRequests, useFetch, useRequestStatus, useSocket
-├── store/         # requestStore.js (Pinia)
-├── router/        # index.js
-├── services/      # requestService.js (comunicación con Express)
-├── layouts/       # MainLayout.vue
-├── styles/        # variables.scss, main.scss
-├── plugins/       # axios.js, socket.js
-├── utils/         # formatDate.js, validateRequest.js
-├── App.vue
-└── main.js
-```
-
-### 2.2 Estructura del backend
+### 2.1 Estructura del backend
 
 ```text
 backend/src
@@ -63,6 +47,18 @@ backend/src
 ├── middlewares/     # validateRequest.js, errorHandler.js
 ├── config/          # db.js, redis.js, socket.js
 └── app.js / server.js
+```
+
+### 2.2 Estructura del worker
+
+```text
+worker/src
+├── config/        # db.js, redis.js
+├── models/        # Solicitud.js (Mongoose)
+├── processors/    # solicitudProcessor.js
+├── rules/         # responseRules.js (plantillas por categoría)
+├── utils/         # cache.js, events.js (pub/sub a Redis)
+└── index.js
 ```
 
 ## 3. API REST
@@ -82,21 +78,21 @@ backend/src
 **Requisito:** Docker y Docker Compose instalados.
 
 ```bash
-# 1. Clonar el repositorio
+# 1. Clonar el repositorio (rama backend)
 git clone <url-del-repositorio>
 cd taskflow
+git checkout backend
 
-# 2. Levantar todos los servicios con un solo comando
+# 2. Levantar todos los servicios del backend con un solo comando
 docker compose up --build
 ```
 
-Esto construye e inicia los **4 servicios**: `frontend`, `backend`, `worker` y `redisserver`. MongoDB no se levanta localmente: se usa MongoDB Atlas (variable `MONGO_URI`).
+Esto construye e inicia los **3 servicios**: `backend`, `worker` y `redisserver`. MongoDB no se levanta localmente: se usa MongoDB Atlas (variable `MONGO_URI`).
 
 ### Puertos publicados al equipo anfitrión
 
 | Servicio | Puerto host | URL |
 |---|---|---|
-| Frontend (Vue) | 8080 | http://localhost:8080 |
 | Backend (API) | 4000 | http://localhost:4000/api |
 | Redis | 6379 | redis://localhost:6379 (opcional, para depuración) |
 
@@ -117,26 +113,25 @@ docker compose down -v
 ### Demostrar persistencia (HU-10)
 
 ```bash
-# Registrar una solicitud desde la interfaz (http://localhost:8080)
 docker compose restart backend worker
-# Refrescar el listado en Vue: la solicitud sigue apareciendo
-# (los datos persisten en MongoDB Atlas, no en un volumen local)
+# Registrar/consultar con el cliente API: los datos persisten en MongoDB Atlas
 ```
 
 ### Demostrar el comportamiento de la cola (HU-04)
 
 ```bash
 docker compose stop worker
-# Registrar varias solicitudes desde Vue: quedan en estado "EN COLA"
+# Registrar solicitudes (POST /api/solicitudes): quedan en estado "EN COLA"
 docker compose start worker
 # El Worker las procesa automáticamente una a una
 ```
 
 ### Demostrar CACHE HIT / CACHE MISS (HU-08)
 
-Consulta el detalle de una solicitud dos veces seguidas y observa el badge junto al estado:
-la primera consulta muestra `CACHE MISS` (se leyó de MongoDB) y la segunda `CACHE HIT`
-(se leyó de Redis), dentro del tiempo de vida configurado (`CACHE_TTL`, 60s por defecto).
+Consulta el detalle de una solicitud (GET `/api/solicitudes/:id`) dos veces
+seguidas y observa el header `X-Cache`: la primera consulta devuelve
+`CACHE MISS` (se leyó de MongoDB) y la segunda `CACHE HIT` (se leyó de
+Redis), dentro del tiempo de vida configurado (`CACHE_TTL`, 60s por defecto).
 
 ## 5. Ejecución en modo desarrollo (sin Docker)
 
@@ -171,12 +166,6 @@ cd worker
 cp .env.example .env      # y reemplazar MONGO_URI por tu string de Atlas
 npm install
 npm run dev
-
-# Frontend (en otra terminal)
-cd frontend
-cp .env.example .env
-npm install
-npm run dev               # http://localhost:5173
 ```
 
 ## 6. Estados de una solicitud
@@ -228,9 +217,10 @@ main                    # Rama protegida - solo vía Pull Request aprobado
 ### Comandos Git básicos
 
 ```bash
-# Clonar
+# Clonar (rama backend)
 git clone <url-del-repositorio>
 cd taskflow
+git checkout backend
 
 # Crear una rama de funcionalidad
 git checkout -b feature/hu-01-registrar-solicitud
@@ -257,14 +247,3 @@ Cada Historia de Usuario (HU) debe registrarse como **Issue**, organizarse en
 **GitHub Projects**, y su desarrollo debe asociarse a una rama, uno o más
 commits, un Pull Request y al menos una revisión de código antes de integrarse
 a la rama principal.
-
-## 9. Reto final de integración
-
-Escenario completo a demostrar (ver sección 24 del enunciado del taller):
-
-1. Registrar una solicitud desde Vue.
-2. Verificar su paso por `EN COLA → PROCESANDO → RESPONDIDA` en tiempo real (sin recargar).
-3. Consultar su detalle dos veces y observar `CACHE MISS` → `CACHE HIT`.
-4. Detener el Worker, registrar nuevas solicitudes y comprobar que permanecen `EN COLA`.
-5. Reiniciar el Worker y comprobar que procesa las solicitudes pendientes.
-6. Reiniciar los contenedores y comprobar que toda la información persiste (MongoDB Atlas).
