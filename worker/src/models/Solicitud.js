@@ -18,7 +18,8 @@ const solicitudSchema = new mongoose.Schema(
     error: { type: String, default: null },
     fechaCreacion: { type: Date, default: Date.now },
     fechaProcesamiento: { type: Date, default: null },
-    fechaRespuesta: { type: Date, default: null }
+    fechaRespuesta: { type: Date, default: null },
+    activa: { type: Boolean, default: true }
   },
   { timestamps: true, versionKey: false }
 );

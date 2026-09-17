@@ -18,7 +18,7 @@ Usuario → Vue 3 → Express (REST + Socket.IO) → MongoDB / Redis
 - El **frontend nunca se conecta directamente** a MongoDB ni a Redis; toda la comunicación pasa por Express.
 - **Socket.IO** notifica al frontend en tiempo real los cambios de estado (`solicitud-creada`, `solicitud-encolada`, `solicitud-procesando`, `solicitud-respondida`, `solicitud-error`, `cola-actualizada`, `monitor-actualizado`).
 - El **Worker** es un proceso Node.js independiente: consume la cola de Redis (BullMQ), procesa la solicitud, genera una respuesta según reglas por categoría y actualiza MongoDB. Como no tiene acceso al navegador, publica sus eventos en un canal Redis (pub/sub) que el backend retransmite por Socket.IO.
-- MongoDB persiste mediante un **volumen Docker** (`mongo-data`), por lo que la información sobrevive a reinicios de los contenedores.
+- MongoDB está en la **nube (MongoDB Atlas)**: la conexión se define con la variable `MONGO_URI` (ver sección 5), por lo que la información sobrevive a reinicios o recreaciones de los contenedores y no depende de un volumen local.
 
 ## 2. Estructura del repositorio
 
@@ -73,7 +73,7 @@ backend/src
 | GET | `/api/solicitudes/:id` | Consultar una solicitud (usa caché Redis, header `X-Cache: HIT/MISS`) |
 | POST | `/api/solicitudes` | Registrar una solicitud (la envía a la cola automáticamente) |
 | PUT | `/api/solicitudes/:id` | Actualizar título, descripción, categoría o prioridad |
-| DELETE | `/api/solicitudes/:id` | Eliminar una solicitud |
+| PATCH | `/api/solicitudes/:id/desactivar` | Desactivar una solicitud (no se elimina; sus datos se conservan) |
 | GET | `/api/solicitudes/estadisticas/resumen` | Estadísticas para el Dashboard |
 | GET | `/api/monitor` | Estado de los servicios (Express, MongoDB, Redis, Worker) y contadores de cola |
 
@@ -90,7 +90,7 @@ cd taskflow
 docker compose up --build
 ```
 
-Esto construye e inicia los **5 servicios**: `frontend`, `backend`, `worker`, `mongoserver`, `redisserver`.
+Esto construye e inicia los **4 servicios**: `frontend`, `backend`, `worker` y `redisserver`. MongoDB no se levanta localmente: se usa MongoDB Atlas (variable `MONGO_URI`).
 
 ### Puertos publicados al equipo anfitrión
 
@@ -98,7 +98,6 @@ Esto construye e inicia los **5 servicios**: `frontend`, `backend`, `worker`, `m
 |---|---|---|
 | Frontend (Vue) | 8080 | http://localhost:8080 |
 | Backend (API) | 4000 | http://localhost:4000/api |
-| MongoDB | 27017 | mongodb://localhost:27017 (opcional, para depuración) |
 | Redis | 6379 | redis://localhost:6379 (opcional, para depuración) |
 
 Para detener todo el entorno:
@@ -107,18 +106,21 @@ Para detener todo el entorno:
 docker compose down
 ```
 
-Para detener y **también borrar** los datos de MongoDB (reinicia el volumen):
+Para detener y **también borrar** los datos locales de Redis:
 
 ```bash
 docker compose down -v
 ```
 
+> Los datos de MongoDB NO se borran con `-v`: viven en MongoDB Atlas (nube).
+
 ### Demostrar persistencia (HU-10)
 
 ```bash
 # Registrar una solicitud desde la interfaz (http://localhost:8080)
-docker compose restart mongoserver backend worker
+docker compose restart backend worker
 # Refrescar el listado en Vue: la solicitud sigue apareciendo
+# (los datos persisten en MongoDB Atlas, no en un volumen local)
 ```
 
 ### Demostrar el comportamiento de la cola (HU-04)
@@ -138,21 +140,35 @@ la primera consulta muestra `CACHE MISS` (se leyó de MongoDB) y la segunda `CAC
 
 ## 5. Ejecución en modo desarrollo (sin Docker)
 
-Requiere tener MongoDB y Redis corriendo localmente (o mediante Docker solo para esos dos servicios).
+Requiere MongoDB Atlas configurado y el conector de MongoDB corriendo localmente (solo Redis).
+
+### 5.1 Configurar MongoDB Atlas (una sola vez)
+
+1. Crear un clúster gratuito (M0) en https://www.mongodb.com/atlas.
+2. Crear un **usuario de base de datos** (Database Access) con rol `readWrite`.
+3. Añadir tu IP en **Network Access** (`0.0.0.0/0` solo para desarrollo).
+4. En **Connect > Drivers**, copiar el connection string `mongodb+srv://...`.
+5. En `backend/.env` y `worker/.env`, pegar ese string en `MONGO_URI` usando el nombre de base de datos `taskflow`:
+   ```
+   mongodb+srv://<usuario>:<contrasena>@<cluster>.mongodb.net/taskflow
+   ```
+6. Si la contraseña contiene `@`, `:`, `/` o `?`, debe estar **URL-encodeada** en el string.
+
+### 5.2 Levantar los servicios
 
 ```bash
-# Servicios de infraestructura únicamente
-docker compose up -d mongoserver redisserver
+# Redis (infraestructura local)
+docker compose up -d redisserver
 
 # Backend
 cd backend
-cp .env.example .env
+cp .env.example .env      # y reemplazar MONGO_URI por tu string de Atlas
 npm install
-npm run dev          # http://localhost:4000
+npm run dev               # http://localhost:4000
 
 # Worker (en otra terminal)
 cd worker
-cp .env.example .env
+cp .env.example .env      # y reemplazar MONGO_URI por tu string de Atlas
 npm install
 npm run dev
 
@@ -160,7 +176,7 @@ npm run dev
 cd frontend
 cp .env.example .env
 npm install
-npm run dev           # http://localhost:5173
+npm run dev               # http://localhost:5173
 ```
 
 ## 6. Estados de una solicitud
@@ -251,4 +267,4 @@ Escenario completo a demostrar (ver sección 24 del enunciado del taller):
 3. Consultar su detalle dos veces y observar `CACHE MISS` → `CACHE HIT`.
 4. Detener el Worker, registrar nuevas solicitudes y comprobar que permanecen `EN COLA`.
 5. Reiniciar el Worker y comprobar que procesa las solicitudes pendientes.
-6. Reiniciar los contenedores y comprobar que toda la información persiste (MongoDB + volumen Docker).
+6. Reiniciar los contenedores y comprobar que toda la información persiste (MongoDB Atlas).

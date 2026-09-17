@@ -58,19 +58,24 @@ const actualizar = asyncHandler(async (req, res) => {
 });
 
 /**
- * DELETE /api/solicitudes/:id
- * Elimina una solicitud.
+ * PATCH /api/solicitudes/:id/desactivar
+ * Desactiva una solicitud sin eliminarla; los datos se conservan en MongoDB.
  */
-const eliminar = asyncHandler(async (req, res) => {
-  const solicitud = await solicitudesService.eliminarSolicitud(req.params.id);
+const desactivar = asyncHandler(async (req, res) => {
+  const solicitud = await solicitudesService.desactivarSolicitud(req.params.id);
 
   if (!solicitud) {
     return res.status(404).json({ exito: false, mensaje: 'La solicitud no fue encontrada.' });
   }
 
-  emitEvent('cola-actualizada', { motivo: 'solicitud-eliminada', solicitudId: req.params.id });
+  emitEvent('solicitud-actualizada', solicitud.toJSON());
+  emitEvent('cola-actualizada', { motivo: 'solicitud-desactivada', solicitudId: req.params.id });
 
-  res.json({ exito: true, mensaje: 'Solicitud eliminada correctamente.' });
+  res.json({
+    exito: true,
+    mensaje: 'Solicitud desactivada correctamente. No fue eliminada, sus datos se conservan.',
+    datos: solicitud
+  });
 });
 
 /**
@@ -82,4 +87,4 @@ const estadisticas = asyncHandler(async (req, res) => {
   res.json({ exito: true, datos: stats });
 });
 
-module.exports = { crear, listar, obtener, actualizar, eliminar, estadisticas };
+module.exports = { crear, listar, obtener, actualizar, desactivar, estadisticas };

@@ -66,6 +66,10 @@ const solicitudSchema = new mongoose.Schema(
     fechaRespuesta: {
       type: Date,
       default: null
+    },
+    activa: {
+      type: Boolean,
+      default: true
     }
   },
   {

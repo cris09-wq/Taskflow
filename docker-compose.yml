@@ -1,28 +1,12 @@
-# TASKFLOW - Orquestación de los 5 servicios principales (sección 6 y 9
-# del enunciado): frontend, backend, worker, mongoserver y redisserver.
+# TASKFLOW - Orquestación de los servicios (sección 6 y 9 del enunciado):
+# frontend, backend, worker y redisserver.
 # Todos los servicios se comunican entre sí utilizando sus nombres de
 # servicio (nunca "localhost") dentro de la red "taskflow-network".
+#
+# Nota: MongoDB no se orquesta con Docker Compose; el proyecto se conecta a
+# MongoDB Atlas (nube) mediante la variable MONGO_URI (ver README).
 
 services:
-
-  # ------------------------------------------------------------------
-  # MongoDB - Persistencia principal (HU-10)
-  # ------------------------------------------------------------------
-  mongoserver:
-    image: mongo:7
-    container_name: taskflow-mongoserver
-    restart: unless-stopped
-    ports:
-      - "27017:27017"   # Puerto publicado al host (opcional, útil para depurar con Compass/mongosh)
-    volumes:
-      - mongo-data:/data/db   # Volumen Docker: conserva los datos aunque el contenedor se recree
-    networks:
-      - taskflow-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # ------------------------------------------------------------------
   # Redis - Caché y cola de procesamiento (HU-04, HU-08)
@@ -54,14 +38,12 @@ services:
       - "4000:4000"   # Puerto publicado al host, consumido por el navegador (Vue)
     environment:
       PORT: 4000
-      MONGO_URI: mongodb://mongoserver:27017/taskflow
+      MONGO_URI: "${MONGO_URI:-mongodb://mongoserver:27017/taskflow}"
       REDIS_HOST: redisserver
       REDIS_PORT: 6379
       CACHE_TTL: 60
       CORS_ORIGIN: http://localhost:8080
     depends_on:
-      mongoserver:
-        condition: service_healthy
       redisserver:
         condition: service_healthy
     networks:
@@ -77,15 +59,13 @@ services:
     container_name: taskflow-worker
     restart: unless-stopped
     environment:
-      MONGO_URI: mongodb://mongoserver:27017/taskflow
+      MONGO_URI: "${MONGO_URI:-mongodb://mongoserver:27017/taskflow}"
       REDIS_HOST: redisserver
       REDIS_PORT: 6379
       WORKER_CONCURRENCY: 2
       HEARTBEAT_INTERVAL_MS: 5000
       PROCESSING_DELAY_MS: 2000
     depends_on:
-      mongoserver:
-        condition: service_healthy
       redisserver:
         condition: service_healthy
     networks:
@@ -116,7 +96,3 @@ services:
 networks:
   taskflow-network:
     driver: bridge
-
-volumes:
-  mongo-data:
-    driver: local

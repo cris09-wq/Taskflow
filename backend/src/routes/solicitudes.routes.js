@@ -12,6 +12,6 @@ router.get('/', controller.listar);
 router.get('/:id', controller.obtener);
 router.post('/', validarCreacionSolicitud, controller.crear);
 router.put('/:id', validarActualizacionSolicitud, controller.actualizar);
-router.delete('/:id', controller.eliminar);
+router.patch('/:id/desactivar', controller.desactivar);
 
 module.exports = router;

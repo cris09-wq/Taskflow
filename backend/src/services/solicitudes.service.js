@@ -34,8 +34,14 @@ async function crearSolicitud(datos) {
 /**
  * Lista solicitudes aplicando filtros opcionales de búsqueda, categoría y estado.
  */
+/**
+ * Lista solicitudes aplicando filtros opcionales de búsqueda, categoría y estado.
+ * Solo se muestran solicitudes activas. Se usa `{ $ne: false }` en lugar de
+ * `true` para incluir también los registros existentes que no tienen el campo
+ * `activa` (creados antes de que existiera el campo).
+ */
 async function listarSolicitudes({ busqueda, categoria, estado, prioridad } = {}) {
-  const filtro = {};
+  const filtro = { activa: { $ne: false } };
 
   if (categoria) filtro.categoria = categoria;
   if (estado) filtro.estado = estado;
@@ -92,21 +98,27 @@ async function actualizarSolicitud(id, cambios) {
 }
 
 /**
- * Elimina una solicitud e invalida su entrada en caché.
+ * Desactiva una solicitud sin eliminarla: la marca como inactiva para que
+ * ya no aparezca en el listado, pero los datos se conservan en MongoDB.
  */
-async function eliminarSolicitud(id) {
-  const solicitud = await Solicitud.findByIdAndDelete(id);
-  if (solicitud) {
-    await invalidarCache(id);
-  }
+async function desactivarSolicitud(id) {
+  const solicitud = await Solicitud.findById(id);
+  if (!solicitud) return null;
+
+  solicitud.activa = false;
+  await solicitud.save();
+  await invalidarCache(id);
+
   return solicitud;
 }
 
 /**
- * Calcula estadísticas agregadas para el Dashboard y el Monitor (HU-09).
+ * Calcula estadísticas agregadas para el Dashboard y el Monitor (HU-09),
+ * considerando únicamente solicitudes activas.
  */
 async function obtenerEstadisticas() {
   const resultados = await Solicitud.aggregate([
+    { $match: { activa: { $ne: false } } },
     { $group: { _id: '$estado', total: { $sum: 1 } } }
   ]);
 
@@ -132,6 +144,6 @@ module.exports = {
   listarSolicitudes,
   obtenerSolicitudPorId,
   actualizarSolicitud,
-  eliminarSolicitud,
+  desactivarSolicitud,
   obtenerEstadisticas
 };

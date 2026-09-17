@@ -28,8 +28,8 @@ export function useRequests() {
     return ejecutar(() => requestService.crear(payload));
   }
 
-  async function eliminarSolicitud(id) {
-    return ejecutar(() => requestService.eliminar(id));
+  async function desactivarSolicitud(id) {
+    return ejecutar(() => requestService.desactivar(id));
   }
 
   function aplicarFiltros(nuevosFiltros) {
@@ -52,7 +52,7 @@ export function useRequests() {
     cargarEstadisticas,
     cargarSolicitud,
     crearSolicitud,
-    eliminarSolicitud,
+    desactivarSolicitud,
     aplicarFiltros,
     actualizarSolicitudLocal
   };

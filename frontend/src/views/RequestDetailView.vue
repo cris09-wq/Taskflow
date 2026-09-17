@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useRequests } from '../composables/useRequests';
 import { useRequestStatus } from '../composables/useRequestStatus';
@@ -16,11 +16,44 @@ const { infoCategoria, infoPrioridad } = useRequestStatus();
 const { on } = useSocket();
 
 const cacheInfo = ref(null);
-const eliminando = ref(false);
+const desactivando = ref(false);
+const POLL_INTERVAL_MS = 2000;
+let temporizadorSondeo = null;
+
+const ESTADOS_TERMINALES = ['RESPONDIDA', 'ERROR'];
 
 async function cargar() {
   const resultado = await cargarSolicitud(route.params.id);
   cacheInfo.value = resultado.cache;
+}
+
+// Respaldo a Socket.IO: mientras la solicitud no haya terminado, se refresca
+// periódicamente desde la API para que la respuesta aparezca aunque el evento
+// en tiempo real no llegue (por ejemplo, por CORS o reconexión del socket).
+function sondeo() {
+  detenerSondeo();
+  temporizadorSondeo = setInterval(async () => {
+    const estado = solicitudSeleccionada.value?.estado;
+    if (!estado || ESTADOS_TERMINALES.includes(estado)) {
+      detenerSondeo();
+      return;
+    }
+    try {
+      const respuesta = await requestService.obtener(route.params.id);
+      if (respuesta.datos) {
+        solicitudSeleccionada.value = respuesta.datos;
+      }
+    } catch {
+      // Se ignora: el siguiente ciclo reintentará.
+    }
+  }, POLL_INTERVAL_MS);
+}
+
+function detenerSondeo() {
+  if (temporizadorSondeo) {
+    clearInterval(temporizadorSondeo);
+    temporizadorSondeo = null;
+  }
 }
 
 // Actualiza la vista automáticamente cuando el evento corresponde a
@@ -37,16 +70,17 @@ on('solicitud-respondida', manejarEvento);
 on('solicitud-error', manejarEvento);
 on('solicitud-actualizada', manejarEvento);
 
-async function eliminar() {
-  if (!confirm('¿Deseas eliminar esta solicitud? Esta acción no se puede deshacer.')) return;
-  eliminando.value = true;
+async function desactivar() {
+  if (!confirm('¿Deseas desactivar esta solicitud? No se eliminará: dejará de aparecer en el listado y sus datos se conservarán.')) return;
+  desactivando.value = true;
   try {
-    await requestService.eliminar(route.params.id);
+    await requestService.desactivar(route.params.id);
+    alert('La solicitud fue desactivada. Sus datos se conservan en el sistema.');
     router.push({ name: 'solicitudes' });
   } catch (err) {
     alert(err.mensaje);
   } finally {
-    eliminando.value = false;
+    desactivando.value = false;
   }
 }
 
@@ -57,7 +91,24 @@ const prioridadInfo = computed(() =>
   solicitudSeleccionada.value ? infoPrioridad(solicitudSeleccionada.value.prioridad) : { etiqueta: '', color: '' }
 );
 
-onMounted(cargar);
+onMounted(async () => {
+  await cargar();
+  const estado = solicitudSeleccionada.value?.estado;
+  if (estado && !ESTADOS_TERMINALES.includes(estado)) {
+    sondeo();
+  }
+});
+
+watch(
+  () => solicitudSeleccionada.value?.estado,
+  (estado) => {
+    if (estado && ESTADOS_TERMINALES.includes(estado)) {
+      detenerSondeo();
+    }
+  }
+);
+
+onBeforeUnmount(detenerSondeo);
 </script>
 
 <template>
@@ -83,6 +134,10 @@ onMounted(cargar);
           </span>
         </div>
       </div>
+
+      <p v-if="solicitudSeleccionada.activa === false" class="alert alert-warning">
+        Esta solicitud está desactivada. No aparece en el listado, pero sus datos se conservan en el sistema.
+      </p>
 
       <dl class="request-detail__grid">
         <div>
@@ -128,8 +183,12 @@ onMounted(cargar);
       </div>
 
       <div class="request-detail__actions">
-        <BaseButton variant="danger" :disabled="eliminando" @click="eliminar">
-          {{ eliminando ? 'Eliminando...' : 'Eliminar solicitud' }}
+        <BaseButton
+          variant="danger"
+          :disabled="desactivando || solicitudSeleccionada.activa === false"
+          @click="desactivar"
+        >
+          {{ desactivando ? 'Desactivando...' : 'Desactivar solicitud' }}
         </BaseButton>
       </div>
     </div>

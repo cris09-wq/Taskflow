@@ -45,10 +45,11 @@ const requestService = {
   },
 
   /**
-   * DELETE /solicitudes/:id
+   * PATCH /solicitudes/:id/desactivar
+   * Desactiva una solicitud sin eliminarla; sus datos se conservan.
    */
-  async eliminar(id) {
-    const { data } = await apiClient.delete(`/solicitudes/${id}`);
+  async desactivar(id) {
+    const { data } = await apiClient.patch(`/solicitudes/${id}/desactivar`);
     return data;
   },
 
