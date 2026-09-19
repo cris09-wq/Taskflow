@@ -115,6 +115,23 @@ function verDetalle(id) {
   margin-right: 6px;
 }
 
+:global([data-theme='dark']) .requests-table {
+  background: #0b1019;
+
+  th,
+  td {
+    border-color: #263244 !important;
+  }
+
+  th {
+    background: #182230;
+  }
+
+  tbody tr:hover {
+    background: rgba(51, 65, 85, 0.32);
+  }
+}
+
 @media (max-width: $breakpoint-mobile) {
   .requests-table {
     min-width: 0;

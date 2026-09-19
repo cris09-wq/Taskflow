@@ -19,12 +19,14 @@ defineProps({
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use '../../styles/variables.scss' as *;
+
 .stat-card {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 18px;
+  padding: 16px;
 }
 
 .stat-card__icon {
@@ -45,14 +47,14 @@ defineProps({
 }
 
 .stat-card__valor {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .stat-card__etiqueta {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: $color-text-muted;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

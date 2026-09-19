@@ -42,10 +42,12 @@ function irADetalle() {
   border: 1px solid $color-border;
   background: $color-surface;
   cursor: pointer;
-  transition: box-shadow 0.15s ease, transform 0.1s ease;
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
 
   &:hover {
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
   }
 }
 

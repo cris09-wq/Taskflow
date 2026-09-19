@@ -17,6 +17,9 @@ const { on } = useSocket();
 
 const cacheInfo = ref(null);
 const desactivando = ref(false);
+const mostrarConfirmacion = ref(false);
+const mensajeExito = ref(null);
+const mensajeError = ref(null);
 const POLL_INTERVAL_MS = 2000;
 let temporizadorSondeo = null;
 
@@ -70,15 +73,27 @@ on('solicitud-respondida', manejarEvento);
 on('solicitud-error', manejarEvento);
 on('solicitud-actualizada', manejarEvento);
 
-async function desactivar() {
-  if (!confirm('¿Deseas desactivar esta solicitud? No se eliminará: dejará de aparecer en el listado y sus datos se conservarán.')) return;
+function desactivar() {
+  mensajeError.value = null;
+  mostrarConfirmacion.value = true;
+}
+
+function cancelarDesactivacion() {
+  if (desactivando.value) return;
+  mostrarConfirmacion.value = false;
+}
+
+async function confirmarDesactivacion() {
   desactivando.value = true;
+  mensajeError.value = null;
   try {
     await requestService.desactivar(route.params.id);
-    alert('La solicitud fue desactivada. Sus datos se conservan en el sistema.');
+    mostrarConfirmacion.value = false;
+    mensajeExito.value = 'La solicitud fue desactivada. Sus datos se conservan en el sistema.';
     router.push({ name: 'solicitudes' });
   } catch (err) {
-    alert(err.mensaje);
+    mensajeError.value = err.mensaje || 'No fue posible desactivar la solicitud. Inténtalo nuevamente.';
+    mostrarConfirmacion.value = false;
   } finally {
     desactivando.value = false;
   }
@@ -119,6 +134,8 @@ onBeforeUnmount(detenerSondeo);
     </div>
 
     <p v-if="error" class="alert alert-error">{{ error }}</p>
+    <p v-if="mensajeExito" class="alert alert-success">{{ mensajeExito }}</p>
+    <p v-if="mensajeError" class="alert alert-error">{{ mensajeError }}</p>
     <p v-if="cargando" class="empty-state">Cargando solicitud...</p>
 
     <div v-else-if="solicitudSeleccionada" class="request-detail card">
@@ -191,6 +208,32 @@ onBeforeUnmount(detenerSondeo);
           {{ desactivando ? 'Desactivando...' : 'Desactivar solicitud' }}
         </BaseButton>
       </div>
+    </div>
+
+    <div v-if="mostrarConfirmacion" class="confirmation-backdrop" @click.self="cancelarDesactivacion">
+      <section
+        class="confirmation-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirmation-title"
+        aria-describedby="confirmation-description"
+      >
+        <div class="confirmation-modal__content">
+          <h2 id="confirmation-title">¿Estás absolutamente seguro?</h2>
+          <p id="confirmation-description">
+            Esta acción no se puede deshacer. La solicitud
+            <strong>{{ solicitudSeleccionada?.titulo }}</strong> dejará de aparecer en el listado, pero sus datos se conservarán.
+          </p>
+        </div>
+        <div class="confirmation-modal__actions">
+          <BaseButton variant="ghost" :disabled="desactivando" @click="cancelarDesactivacion">
+            Cancelar
+          </BaseButton>
+          <BaseButton variant="danger" :disabled="desactivando" @click="confirmarDesactivacion">
+            {{ desactivando ? 'Desactivando...' : 'Continuar' }}
+          </BaseButton>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -296,5 +339,83 @@ onBeforeUnmount(detenerSondeo);
 .request-detail__actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.confirmation-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.confirmation-modal {
+  width: min(100%, 512px);
+  padding: 28px 26px 24px;
+  background: $color-surface;
+  border: 1px solid $color-border;
+  border-radius: 8px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+}
+
+.confirmation-modal__content {
+  h2 {
+    margin: 0 0 12px;
+    color: $color-text;
+    font-size: 1.15rem;
+    letter-spacing: 0;
+  }
+
+  p {
+    margin: 0;
+    color: $color-text-muted;
+    line-height: 1.5;
+  }
+
+  strong {
+    color: $color-text;
+    font-weight: 600;
+  }
+}
+
+.confirmation-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+
+  :deep(.base-button) {
+    min-height: 40px;
+    padding: 9px 18px;
+    border-radius: 7px;
+  }
+
+  :deep(.base-button--ghost) {
+    background: transparent;
+    border-color: $color-border;
+    color: $color-text-muted;
+  }
+
+  :deep(.base-button--danger) {
+    background: $color-error;
+    color: #fff;
+  }
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .confirmation-modal {
+    padding: 24px 20px 20px;
+  }
+
+  .confirmation-modal__actions {
+    flex-direction: column-reverse;
+
+    :deep(.base-button) {
+      width: 100%;
+    }
+  }
 }
 </style>

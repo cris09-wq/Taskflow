@@ -1,9 +1,13 @@
 <script setup>
+import { useTheme } from '../../composables/useTheme';
+
 defineProps({
   conectado: { type: Boolean, default: false }
 });
 
 defineEmits(['toggle-menu']);
+
+const { temaOscuro, establecerTema } = useTheme();
 </script>
 
 <template>
@@ -12,15 +16,29 @@ defineEmits(['toggle-menu']);
       ☰
     </button>
 
-    <div class="app-header__brand">
-      <span class="app-header__logo">⚡</span>
-      <span class="app-header__title">TASKFLOW</span>
+    <div class="app-header__theme-switch" role="group" aria-label="Seleccionar tema">
+      <button
+        class="app-header__theme-option"
+        :class="{ 'app-header__theme-option--active': !temaOscuro }"
+        type="button"
+        aria-label="Activar modo claro"
+        title="Modo claro"
+        @click="establecerTema(false)"
+      >
+        <span aria-hidden="true">☼</span>
+      </button>
+      <button
+        class="app-header__theme-option"
+        :class="{ 'app-header__theme-option--active': temaOscuro }"
+        type="button"
+        aria-label="Activar modo oscuro"
+        title="Modo oscuro"
+        @click="establecerTema(true)"
+      >
+        <span aria-hidden="true">☾</span>
+      </button>
     </div>
 
-    <div class="app-header__status" :title="conectado ? 'Conectado en tiempo real' : 'Sin conexión en tiempo real'">
-      <span class="app-header__dot" :class="{ 'app-header__dot--on': conectado }" />
-      <span class="app-header__status-label">{{ conectado ? 'En línea' : 'Desconectado' }}</span>
-    </div>
   </header>
 </template>
 
@@ -28,13 +46,14 @@ defineEmits(['toggle-menu']);
 @use '../../styles/variables.scss' as *;
 
 .app-header {
-  height: $header-height;
+  height: 56px;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 20px;
-  background: $color-surface;
+  padding: 0 24px;
+  background: rgba(10, 15, 24, 0.96);
   border-bottom: 1px solid $color-border;
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.08);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -52,38 +71,41 @@ defineEmits(['toggle-menu']);
   }
 }
 
-.app-header__brand {
-  display: flex;
+.app-header__theme-switch {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: $color-primary;
-}
-
-.app-header__status {
+  gap: 2px;
   margin-left: auto;
-  display: flex;
+  padding: 3px;
+  border: 1px solid $color-border;
+  border-radius: 999px;
+  background: rgba(13, 20, 34, 0.9);
+}
+
+.app-header__theme-option {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  color: $color-text-muted;
-}
-
-.app-header__dot {
-  width: 9px;
-  height: 9px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
-  background: $color-error;
+  background: transparent;
+  color: $color-text-muted;
+  font-size: 1.05rem;
+  line-height: 1;
+  transition: background-color 0.2s ease, color 0.2s ease;
 
-  &--on {
-    background: $color-respondida;
+  &:hover {
+    color: $color-primary;
+  }
+
+  &--active {
+    background: rgba(168, 85, 247, 0.18);
+    color: #f5d0fe;
+    box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.35);
   }
 }
 
-.app-header__status-label {
-  @media (max-width: $breakpoint-mobile) {
-    display: none;
-  }
-}
 </style>

@@ -10,7 +10,6 @@ const menuAbierto = ref(false);
 const items = [
   { to: { name: 'dashboard' }, etiqueta: 'Dashboard', icono: '🏠' },
   { to: { name: 'solicitudes' }, etiqueta: 'Solicitudes', icono: '📋' },
-  { to: { name: 'solicitudes-nueva' }, etiqueta: 'Nueva', icono: '➕' },
   { to: { name: 'monitor' }, etiqueta: 'Monitor', icono: '🩺' }
 ];
 
@@ -25,10 +24,16 @@ function cerrarMenu() {
 
 <template>
   <div class="main-layout">
-    <AppHeader :conectado="conectado" @toggle-menu="toggleMenu" />
-
     <div class="main-layout__body">
       <aside class="main-layout__sidebar" :class="{ 'main-layout__sidebar--open': menuAbierto }">
+        <div class="main-layout__brand">
+          <div class="main-layout__brand-mark">⚡</div>
+          <div>
+            <strong>TASKFLOW</strong>
+            <span>ENTERPRISE OS</span>
+          </div>
+        </div>
+
         <nav class="main-layout__nav">
           <RouterLink
             v-for="item in items"
@@ -42,6 +47,7 @@ function cerrarMenu() {
             {{ item.etiqueta }}
           </RouterLink>
         </nav>
+
       </aside>
 
       <div
@@ -50,9 +56,12 @@ function cerrarMenu() {
         @click="cerrarMenu"
       />
 
-      <main class="main-layout__content">
-        <RouterView />
-      </main>
+      <div class="main-layout__workspace">
+        <AppHeader :conectado="conectado" @toggle-menu="toggleMenu" />
+        <main class="main-layout__content">
+          <RouterView />
+        </main>
+      </div>
     </div>
   </div>
 </template>
@@ -61,22 +70,22 @@ function cerrarMenu() {
 @use '../styles/variables.scss' as *;
 
 .main-layout {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
+  min-height: 100vh;
 }
 
 .main-layout__body {
   display: flex;
-  flex: 1;
-  min-height: 0;
+  min-height: 100vh;
 }
 
 .main-layout__sidebar {
   width: $sidebar-width;
-  background: $color-surface;
+  background: rgba(8, 15, 26, 0.96);
   border-right: 1px solid $color-border;
-  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: 24px 14px 16px;
 
   @media (max-width: $breakpoint-tablet) {
     position: fixed;
@@ -109,27 +118,68 @@ function cerrarMenu() {
 .main-layout__nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+}
+
+.main-layout__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  margin: 0 0 34px;
+
+  strong,
+  span {
+    display: block;
+  }
+
+  strong {
+    color: $color-text;
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+  }
+
+  span {
+    margin-top: 2px;
+    color: $color-secondary;
+    font-size: 0.52rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+  }
+}
+
+.main-layout__brand-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, $color-primary, $color-secondary);
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(168, 85, 247, 0.35);
+  font-size: 1rem;
 }
 
 .main-layout__link {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
-  border-radius: $radius-sm;
+  padding: 11px 14px;
+  border: 1px solid transparent;
+  border-radius: $radius-md;
   color: $color-text-muted;
   font-weight: 600;
   font-size: 0.9rem;
 
   &:hover {
-    background: rgba(79, 70, 229, 0.06);
-    color: $color-primary;
+    background: rgba(168, 85, 247, 0.08);
+    color: #d8b4fe;
   }
 
   &--active {
-    background: rgba(79, 70, 229, 0.12);
-    color: $color-primary;
+    background: rgba(168, 85, 247, 0.18);
+    border-color: rgba(168, 85, 247, 0.28);
+    color: #e9d5ff;
   }
 }
 
@@ -140,5 +190,16 @@ function cerrarMenu() {
 .main-layout__content {
   flex: 1;
   min-width: 0;
+  background: $color-bg;
 }
+
+.main-layout__workspace {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+  flex-direction: column;
+  background: $color-bg;
+}
+
 </style>

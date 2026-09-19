@@ -1,13 +1,10 @@
 <script setup>
 import { onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import { useRequests } from '../composables/useRequests';
 import { useSocket } from '../composables/useSocket';
 import StatCard from '../components/StatCard/StatCard.vue';
 import RequestCard from '../components/Requests/RequestCard.vue';
-import BaseButton from '../components/Buttons/BaseButton.vue';
 
-const router = useRouter();
 const { solicitudes, estadisticas, cargando, error, cargarSolicitudes, cargarEstadisticas, actualizarSolicitudLocal } =
   useRequests();
 const { on } = useSocket();
@@ -37,9 +34,6 @@ onMounted(cargarTodo);
   <div class="page">
     <div class="page-header">
       <h1>Dashboard</h1>
-      <BaseButton variant="primary" @click="router.push({ name: 'solicitudes-nueva' })">
-        ➕ Nueva solicitud
-      </BaseButton>
     </div>
 
     <p v-if="error" class="alert alert-error">{{ error }}</p>
