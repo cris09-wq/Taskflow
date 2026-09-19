@@ -13,6 +13,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    strictPort: true,
     // Permite acceder a Vite dentro del contenedor Docker.
     watch: {
       usePolling: true
